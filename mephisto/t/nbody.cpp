@@ -38,6 +38,9 @@
 #include "Dummy.hpp"
 #include "Human.hpp"
 
+#include <mephisto/container>
+#include <mephisto/views>
+
 using Element = float;
 constexpr Element EPS2 = 0.01;
 
@@ -383,7 +386,13 @@ int main(int argc, char *argv[])
     constexpr std::size_t steps = NBODY_STEPS;
 
     //DASH
-    dash::Array<particle> particles;
+    //dash::Array<particle> particles;
+
+    auto particles = mephisto::container::llama_factory<
+      mephisto::container::factory::dash_Array,
+      Particle,
+      llama::mapping::SoA
+    >::create<std::size_t>(elemCount);
 
     // LLAMA
     using UserDomain = llama::UserDomain< 1 >;
@@ -394,6 +403,8 @@ int main(int argc, char *argv[])
         Particle
     >;
     Mapping const mapping( userDomainSize );
+
+
 
     using DevFactory = llama::Factory<
         Mapping,
@@ -432,7 +443,8 @@ int main(int argc, char *argv[])
     HRChrono chrono;
 
     particles.allocate(size * problemSize);
-    auto   hostView = LocalFactory::allocView( mapping, particles.lbegin() );
+    //auto   hostView = LocalFactory::allocView( mapping, particles.lbegin() ); //sollte auch schon funktionieren
+    auto   hostView = mephisto::view::llama_view::create_host_view<decltype(particles)>(particles);
     auto    devView =    DevFactory::allocView( mapping,  devAcc );
     auto mirrowView = MirrorFactory::allocView( mapping, devView );
 
