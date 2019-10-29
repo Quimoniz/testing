@@ -446,12 +446,12 @@ int main(int argc, char *argv[])
     //auto   hostView = LocalFactory::allocView( mapping, particles.lbegin() ); //sollte auch schon funktionieren
     auto   hostView = mephisto::view::llama_view::create_host_view<decltype(particles)>(particles);
     auto    devView =    DevFactory::allocView( mapping,  devAcc );
-    auto mirrowView = MirrorFactory::allocView( mapping, devView );
+    auto mirrorView = MirrorFactory::allocView( mapping, devView );
 
     // will be used as double buffer for remote->host and host->device copying
     auto   remoteHostView =   HostFactory::allocView( mapping, devHost );
     auto    remoteDevView =    DevFactory::allocView( mapping,  devAcc );
-    auto remoteMirrowView = MirrorFactory::allocView( mapping, remoteDevView );
+    auto remoteMirrorView = MirrorFactory::allocView( mapping, remoteDevView );
 
     chrono.printAndReset("Alloc:");
 
@@ -529,8 +529,8 @@ int main(int argc, char *argv[])
             queue,
             workdiv,
             updateKernel,
-            mirrowView,
-            mirrowView,
+            mirrorView,
+            mirrorView,
             ts
         );
 
@@ -555,8 +555,8 @@ int main(int argc, char *argv[])
                 queue,
                 workdiv,
                 updateKernel,
-                mirrowView,
-                remoteMirrowView,
+                mirrorView,
+                remoteMirrorView,
                 ts
             );
 
@@ -567,11 +567,11 @@ int main(int argc, char *argv[])
             queue,
             workdiv,
             moveKernel,
-            mirrowView,
+            mirrorView,
             ts
         );
         chrono.printAndReset("Move kernel:         ");
-        dummy( static_cast<void*>( mirrowView.blob[0] ) );
+        dummy( static_cast<void*>( mirrorView.blob[0] ) );
 
         alpaka::mem::view::copy(queue,
             hostPlain,
