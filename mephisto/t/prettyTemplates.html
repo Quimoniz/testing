@@ -1,0 +1,101 @@
+<html>
+<head>
+<script type="text/javascript">
+function formatTemplates(unformattedJson)
+{
+  var inString = false;
+  var inEscape = false;
+  var depth = 0;
+  var outStr = "";
+  for(var i = 0, c =""; i < unformattedJson.length; ++i)
+  {
+    c = unformattedJson.charAt(i);
+    if(inString)
+    {
+      if(inEscape)
+      {
+        outStr += "\\" + c;
+        inEscape = false;
+      } else
+      {
+        if("\\" == c)
+        {
+          inEscape = true;
+        } else
+        {
+          if("\"" == c)
+          {
+            inString = false;
+          }
+          outStr += c;
+        }
+      }
+    // else, not in string
+    } else {
+      switch(c)
+      {
+        case "\"":
+          inString = true;
+          outStr += c;
+          break;
+/*
+        case ":":
+          outStr += c;
+          outStr += " ";
+          break;
+*/
+        case ",":
+          outStr += c;
+          outStr += "\n";
+          outStr += repeatString("  ", depth);
+          break;
+        case "<": /* fall-through */
+        case "(":
+          ++depth;
+          outStr += c;
+          outStr += "\n";
+          outStr += repeatString("  ", depth);
+          break;
+        case ">": /* fall-through */
+        case ")":
+          --depth;
+          outStr += "\n";
+          outStr += repeatString("  ", depth);
+          outStr += c;
+          break;
+        default:
+          outStr += c;
+          break;
+      }
+    }
+  }
+  return outStr;
+}
+function repeatString(baseStr, repetitions)
+{
+  var outStr = "";
+  for(var i = 0; i < repetitions; ++i)
+  {
+    outStr += baseStr;
+  }
+  return outStr;
+}
+function prettyFormat()
+{
+  var sourceEle = document.getElementsByName("source_text")[0];
+  var outputEle = document.getElementsByName("output_text")[0];
+  outputEle.value = formatTemplates(sourceEle.value);
+}
+</script>
+<style type="text/css">
+html, body, * {
+  font-size: 16pt;
+}
+</style>
+</head>
+<body>
+<textarea name="source_text" rows="5" cols="140"></textarea><br/>
+<input type="button" value="\|/" onclick="prettyFormat();" /><br/>
+<textarea name="output_text" rows="25" cols="140"></textarea>
+</body>
+</html>
