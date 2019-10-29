@@ -451,7 +451,7 @@ int main(int argc, char *argv[])
     // will be used as double buffer for remote->host and host->device copying
     auto   remoteHostView =   HostFactory::allocView( mapping, devHost );
     auto    remoteDevView =    DevFactory::allocView( mapping,  devAcc );
-    auto remoteMirrowView = MirrorFactory::allocView( mapping, devView );
+    auto remoteMirrowView = MirrorFactory::allocView( mapping, remoteDevView );
 
     chrono.printAndReset("Alloc:");
 
@@ -544,7 +544,7 @@ int main(int argc, char *argv[])
             // get remote local block into remoteHostView
             auto remote_begin = particles.begin() + (remote * problemSize);
             auto remote_end   = remote_begin + problemSize;
-            auto target_begin = reinterpret_cast<particle*>(alpaka::mem::view::getPtrNative(remoteHostView.blob[0].buffer));
+            auto target_begin = reinterpret_cast<decltype(particles)::value_type*>(alpaka::mem::view::getPtrNative(remoteHostView.blob[0].buffer));
             dash::copy(remote_begin, remote_end, target_begin);
 
             chrono.printAndReset("Copy from remote:    ");
