@@ -48,19 +48,19 @@ add_definitions(${llama_DEFINITIONS})
 #        PUBLIC "alpaka;${DASH_LIBRARIES};gtest_main")
 #ENDIF()
 
-ALPAKA_ADD_EXECUTABLE(
-    llama_container
-    "llama_container.cpp")
-TARGET_LINK_LIBRARIES(
-    llama_container
-    PUBLIC "${DASH_LIBRARIES}")
-
-ALPAKA_ADD_EXECUTABLE(
-    llama_container_view
-    "llama_container_view.cpp")
-TARGET_LINK_LIBRARIES(
-    llama_container_view
-    PUBLIC "${DASH_LIBRARIES}")
+#ALPAKA_ADD_EXECUTABLE(
+#    llama_container
+#    "llama_container.cpp")
+#TARGET_LINK_LIBRARIES(
+#    llama_container
+#    PUBLIC "${DASH_LIBRARIES}")
+#
+#ALPAKA_ADD_EXECUTABLE(
+#    llama_container_view
+#    "llama_container_view.cpp")
+#TARGET_LINK_LIBRARIES(
+#    llama_container_view
+#    PUBLIC "${DASH_LIBRARIES}")
 
 set(LIBRARIES ${LIBRARIES} ${DASH_LIBRARIES})
 set(LIBRARIES ${LIBRARIES} ${alpaka_LIBRARIES})

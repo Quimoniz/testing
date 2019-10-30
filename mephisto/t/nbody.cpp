@@ -392,7 +392,8 @@ int main(int argc, char *argv[])
       mephisto::container::factory::dash_Array,
       Particle,
       llama::mapping::SoA
-    >::create<std::size_t>(elemCount);
+    >::create(elemCount);
+
 
     // LLAMA
     using UserDomain = llama::UserDomain< 1 >;
@@ -444,8 +445,10 @@ int main(int argc, char *argv[])
 
     particles.allocate(size * problemSize);
     //auto   hostView = LocalFactory::allocView( mapping, particles.lbegin() ); //sollte auch schon funktionieren
-    auto   hostView = mephisto::view::llama_view::create_host_view<decltype(particles)>(particles);
+    auto   hostView = mephisto::view::llama_view<Size>::create_host_view(particles);
     auto    devView =    DevFactory::allocView( mapping,  devAcc );
+    //auto devView = mephisto::view::llama_view::create_dev_view<decltype(particles), decltype(devAcc)>(particles, devAcc);
+    mephisto::view::llama_view<Size>::create_dev_view(particles, devAcc);
     auto mirrorView = MirrorFactory::allocView( mapping, devView );
 
     // will be used as double buffer for remote->host and host->device copying
