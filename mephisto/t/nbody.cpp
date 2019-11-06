@@ -445,18 +445,13 @@ int main(int argc, char *argv[])
     HRChrono chrono;
 
     particles.allocate(size * problemSize);
-    //auto   hostView = LocalFactory::allocView( mapping, particles.lbegin() ); //sollte auch schon funktionieren
     auto   hostView = mephisto::view::llama_view<Size>::create_host_view(particles);
-    auto    devView =    DevFactory::allocView( mapping,  devAcc );
-    auto devView2 = mephisto::view::llama_view<Size>::create_dev_view(particles, devAcc);
-    //mephisto::view::llama_view<Size>::create_dev_view(particles, devAcc);
-    std::cout << typeid(devView).name() << std::endl;
-    std::cout << typeid(devView2).name() << std::endl;
-    auto mirrorView = MirrorFactory::allocView( mapping, devView );
-    auto mirrorView2 = mephisto::view::llama_view<Size>::create_mirror_view(particles, devAcc, devView2);
+    auto devView = mephisto::view::llama_view<Size>::create_dev_view(particles, devAcc);
+    auto mirrorView = mephisto::view::llama_view<Size>::create_mirror_view(particles, devAcc, devView);
 
     // will be used as double buffer for remote->host and host->device copying
     auto   remoteHostView =   HostFactory::allocView( mapping, devHost );
+    //auto remoteHostView2  = mephisto::view::llama_view<Size>::create_host_view(devHost);
     auto    remoteDevView =    DevFactory::allocView( mapping,  devAcc );
     auto remoteMirrorView = MirrorFactory::allocView( mapping, remoteDevView );
 
