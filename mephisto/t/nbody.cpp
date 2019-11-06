@@ -453,6 +453,7 @@ int main(int argc, char *argv[])
     std::cout << typeid(devView).name() << std::endl;
     std::cout << typeid(devView2).name() << std::endl;
     auto mirrorView = MirrorFactory::allocView( mapping, devView );
+    auto mirrorView2 = mephisto::view::llama_view<Size>::create_mirror_view(particles, devAcc, devView2);
 
     // will be used as double buffer for remote->host and host->device copying
     auto   remoteHostView =   HostFactory::allocView( mapping, devHost );
