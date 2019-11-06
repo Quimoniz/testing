@@ -292,12 +292,11 @@ struct llama_view
     static
     auto
     create_dev_view(ContainerT& container, FooDevT& devAcc)
-    /*
     -> llama::View<
         typename ContainerT::value_type::mapping_type,
-         typename details::Alpaka<FooDevT, size_type>::BlobType
+        typename details::Alpaka<std::remove_const_t<FooDevT>, size_type>::BlobType
     >
-    */
+    
     {
         /*
         using DevFactory = llama::Factory<
@@ -308,7 +307,7 @@ struct llama_view
             >
         >;
         */
-        using dev_type = FooDevT; /* DO NOT PUT A `typename` HERE
+        using dev_type = std::remove_const_t<FooDevT>; /* DO NOT PUT A `typename` HERE
                                    * "The typename is not needed there, and is therefore not allowed. "
                                    *  https://stackoverflow.com/a/6489381 */
         using container_value_type   = typename ContainerT::value_type;
@@ -329,7 +328,7 @@ struct llama_view
             alpakaAllocator
         >;
         
-        //return factory::allocView(mapping, devAcc);
+        return factory::allocView(mapping, devAcc);
 
         /*
         using factory = llama::Factory<

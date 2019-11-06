@@ -2,6 +2,7 @@
 #include <vector>
 
 #include <libdash.h>
+#include <alpaka/alpaka.hpp>
 
 #include <mephisto/container>
 #include <mephisto/views>
