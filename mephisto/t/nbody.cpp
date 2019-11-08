@@ -55,18 +55,6 @@ namespace dd
     struct Mass {};
 }
 
-struct particle
-{
-    struct
-    {
-        Element x, y, z;
-    } pos;
-    struct
-    {
-        Element x, y, z;
-    } vel;
-    Element mass;
-};
 
 using Particle = llama::DS<
     llama::DE< dd::Pos, llama::DS<
@@ -313,28 +301,6 @@ struct MoveKernel
     }
 };
 
-template<
-    typename T_Parameter
->
-struct PassThroughAllocator
-{
-    using PrimType = unsigned char;
-    using BlobType = PrimType*;
-    using Parameter = T_Parameter*;
-
-    LLAMA_NO_HOST_ACC_WARNING
-    static inline
-    auto
-    allocate(
-        std::size_t count,
-        Parameter const pointer
-    )
-    -> BlobType
-    {
-        return reinterpret_cast<BlobType>(pointer);
-    }
-};
-
 
 int main(int argc, char *argv[])
 {
@@ -407,36 +373,6 @@ int main(int argc, char *argv[])
     Mapping const mapping( userDomainSize );
 
 
-
-    using DevFactory = llama::Factory<
-        Mapping,
-        common::allocator::Alpaka<
-            DevAcc,
-            Size
-        >
-    >;
-    using MirrorFactory = llama::Factory<
-        Mapping,
-        common::allocator::AlpakaMirror<
-            DevAcc,
-            Size,
-            Mapping
-        >
-    >;
-    using HostFactory = llama::Factory<
-        Mapping,
-        common::allocator::Alpaka<
-            DevHost,
-            Size
-        >
-    >;
-    using LocalFactory = llama::Factory<
-        Mapping,
-        PassThroughAllocator<
-            particle
-        >
-    >;
-
     if (myid == 0) {
         std::cout << (size * problemSize) / 1000 << " thousand particles (";
         std::cout << human_readable(size * (problemSize * llama::SizeOf<Particle>::value)) << ")\n";
@@ -445,17 +381,15 @@ int main(int argc, char *argv[])
     HRChrono chrono;
 
     particles.allocate(size * problemSize);
-    auto viewObject = mephisto::view::llama_view<decltype(particles)>(particles);
-    auto   hostView = viewObject.create_host_view();
-    auto devView = viewObject.create_dev_view(devAcc); // put hostView in here, not particles
-    auto mirrorView = viewObject.create_mirror_view(devAcc, devView);
+    auto   viewFactory = mephisto::view::make_factory(particles);
+    auto      hostView = viewFactory.create_local_view(devHost);
+    auto       accView = viewFactory.create_dev_view(devAcc, hostView); // put hostView in here, not particles
+    auto mirrorAccView = viewFactory.create_mirror_view(devAcc, accView);
 
     // will be used as double buffer for remote->host and host->device copying
-    auto   remoteHostView =   HostFactory::allocView( mapping, devHost );
-    //auto remoteHostView2  =
-    viewObject.create_host_view(devHost);
-    auto    remoteDevView =    DevFactory::allocView( mapping,  devAcc );
-    auto remoteMirrorView = MirrorFactory::allocView( mapping, remoteDevView );
+    auto      remoteHostView = viewFactory.create_dev_view(devHost);
+    auto       remoteAccView = viewFactory.create_dev_view(devAcc, remoteHostView);
+    auto remoteMirrorAccView = viewFactory.create_mirror_view(devAcc, remoteAccView );
 
     chrono.printAndReset("Alloc:");
 
@@ -486,12 +420,7 @@ int main(int argc, char *argv[])
 
     chrono.printAndReset("Init:");
 
-    alpaka::mem::view::ViewPlainPtr<DevHost, unsigned char, Dim, Size> hostPlain(
-        reinterpret_cast<unsigned char*>(particles.lbegin()), devHost, problemSize * llama::SizeOf<Particle>::value);
-    alpaka::mem::view::copy(queue,
-        devView.blob[0].buffer,
-        hostPlain,
-        problemSize * llama::SizeOf<Particle>::value);
+    alpakaMemCopy( accView, hostView, userDomainSize, queue );
 
     chrono.printAndReset("Copy H->D");
 
@@ -533,8 +462,8 @@ int main(int argc, char *argv[])
             queue,
             workdiv,
             updateKernel,
-            mirrorView,
-            mirrorView,
+            mirrorAccView,
+            mirrorAccView,
             ts
         );
 
@@ -553,14 +482,14 @@ int main(int argc, char *argv[])
 
             chrono.printAndReset("Copy from remote:    ");
 
-            alpakaMemCopy( remoteDevView, remoteHostView, userDomainSize, queue );
+            alpakaMemCopy( remoteAccView, remoteHostView, userDomainSize, queue );
 
             alpaka::kernel::exec< Acc > (
                 queue,
                 workdiv,
                 updateKernel,
-                mirrorView,
-                remoteMirrorView,
+                mirrorAccView,
+                remoteMirrorAccView,
                 ts
             );
 
@@ -571,17 +500,14 @@ int main(int argc, char *argv[])
             queue,
             workdiv,
             moveKernel,
-            mirrorView,
+            mirrorAccView,
             ts
         );
         chrono.printAndReset("Move kernel:         ");
-        dummy( static_cast<void*>( mirrorView.blob[0] ) );
+        dummy( static_cast<void*>( mirrorAccView.blob[0] ) );
 
-        alpaka::mem::view::copy(queue,
-            hostPlain,
-            devView.blob[0].buffer,
-            problemSize * llama::SizeOf<Particle>::value);
-
+        alpakaMemCopy( hostView, accView, userDomainSize, queue );
+        
         particles.barrier();
     }
 

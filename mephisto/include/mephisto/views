@@ -217,57 +217,78 @@ struct AlpakaShared
 
 
 
-
-
-
-
-
-
-
-
-
 template<
-    typename T_Parameter
+    typename T_Dev,
+    typename T_Size
 >
-struct PassThroughAllocator
+struct AlpakaPlainPtr
 {
-    using PrimType = unsigned char;
-    using BlobType = PrimType*;
-    using Parameter = T_Parameter*;
+    using Dev = T_Dev;
+    using Size = T_Size;
 
-    LLAMA_NO_HOST_ACC_WARNING
+    using ViewType = alpaka::mem::view::ViewPlainPtr<
+        Dev,
+        unsigned char,
+        alpaka::dim::DimInt< 1 >,
+        Size
+    >;
+    /** blob type of this allocator is an internal accessor the the alpaka
+     *  buffer
+     */
+    using BlobType = internal::AlpakaAccessor< ViewType >;
+    /// primary type of this allocator is `unsigned char`
+    using PrimType = typename BlobType::PrimType;
+    /// the parameter is the alpaka `DevAcc` instance
+    using Parameter = std::pair<Dev, unsigned char*>;
+
     static inline
     auto
     allocate(
         std::size_t count,
-        Parameter const pointer
+        Parameter params
     )
     -> BlobType
     {
-        return reinterpret_cast<BlobType>(pointer);
+        ViewType view(
+            params.second,
+            params.first,
+            Size(count)
+        );
+        BlobType accessor( view );
+        return accessor;
     }
 };
+
+
+
+
+
+
+
 
 } /* details */
 template<
   typename ContainerT
   >
-struct llama_view
+struct factory
 {
     using size_type = std::size_t;
     using container_type = ContainerT;
     container_type& myContainer;
-    llama_view(container_type& container): myContainer(container) {
+    factory(container_type& container): myContainer(container) {
     }
     /*
     struct myView: public llama::View {
 
     }*/
+    template<
+        typename DevT
+    >
     auto
-    create_host_view()
+    create_local_view(DevT& dev)
     -> llama::View<
         typename container_type::value_type::mapping_type,
-        typename details::PassThroughAllocator<typename container_type::value_type>::BlobType
+        typename details::AlpakaPlainPtr<std::remove_const_t<DevT>, size_type>::BlobType
     >
     {
         using container_value_type     = typename container_type::value_type;
@@ -279,44 +300,15 @@ struct llama_view
 
         using factory = llama::Factory<
             mapping_type,
-            details::PassThroughAllocator<
-                container_value_type
+            details::AlpakaPlainPtr<
+                std::remove_const_t<DevT>,
+                size_type
             >
         >;
         auto user_domain = container_factory_type::extent(myContainer);
         auto mapping = mapping_type(user_domain);
 
-        return factory::allocView(mapping, container_factory_type::data(myContainer));
-    }
-    template<
-      typename DevHostT
-    >
-    auto
-    create_host_view(DevHostT& devHost)
-    /*
-    -> llama::View<
-        typename ContainerT::value_type::mapping_type,
-        typename details::PassThroughAllocator<typename ContainerT::value_type>::BlobType
-    >*/
-    {
-        using container_value_type     = typename container_type::value_type;
-        using container_factory_type   = typename container_value_type::container_factory_type;
-        using container_container_type = typename container_value_type::container_type;
-        using mapping_type             = typename container_value_type::mapping_type;
-        using user_domain_type         = typename mapping_type::UserDomain;
-        using datum_domain_type        = typename mapping_type::DatumDomain;
-        using non_const_dev_host       = std::remove_const_t<DevHostT>;
-
-        using factory = llama::Factory<
-            mapping_type,
-            details::PassThroughAllocator<
-                container_value_type
-            >
-        >;
-        auto user_domain = container_factory_type::extent(myContainer);
-        auto mapping = mapping_type(user_domain);
-
-        //return factory::allocView(mapping, devHost); //static_cast<non_const_dev_host>(devHost));
+        return factory::allocView(mapping, std::make_pair(dev, reinterpret_cast<unsigned char*>(container_factory_type::data(myContainer))));
     }
     template<
         typename DevT
@@ -352,6 +344,39 @@ struct llama_view
         
         return factory::allocView(mapping, devAcc);
     }
+    template<
+        typename DevT,
+        typename HostViewT
+    >
+    auto
+    create_dev_view(DevT& devAcc, HostViewT& hostView)
+    -> llama::View <
+        typename ContainerT::value_type::mapping_type,
+        typename details::Alpaka<std::remove_const_t<DevT>, size_type>::BlobType
+    >
+    
+    {
+        using dev_type = std::remove_const_t<DevT>; /* DO NOT PUT A `typename` HERE
+                                   * "The typename is not needed there, and is therefore not allowed. "
+                                   *  https://stackoverflow.com/a/6489381 */
+        using container_value_type     = typename container_type::value_type;
+        using container_factory_type   = typename container_value_type::container_factory_type;
+        using container_container_type = typename container_value_type::container_type;
+        using mapping_type             = typename container_value_type::mapping_type;
+        using user_domain_type         = typename mapping_type::UserDomain;
+
+        using alpakaAllocator = details::Alpaka<
+                dev_type,
+                size_type
+            >;
+
+        using factory = llama::Factory<
+            mapping_type,
+            alpakaAllocator
+        >;
+        
+        return factory::allocView(hostView.mapping, devAcc);
+    }
     template <
       typename DeviceAccT,
       typename DeviceViewT
@@ -373,8 +398,8 @@ struct llama_view
         using mapping_type             = typename container_value_type::mapping_type;
         using user_domain_type         = typename mapping_type::UserDomain;
         using non_const_dev_acc        = std::remove_const_t<DeviceAccT>;
-        auto user_domain = container_factory_type::extent(myContainer);
-        auto mapping = mapping_type(user_domain); 
+        //auto user_domain = container_factory_type::extent(myContainer);
+        //auto mapping = mapping_type(user_domain); 
         using alpakaMirror = details::AlpakaMirror<
           non_const_dev_acc,
           size_type,
@@ -384,9 +409,18 @@ struct llama_view
           mapping_type,
           alpakaMirror
         >;
-        return factory::allocView(mapping, devView);
+        return factory::allocView(devView.mapping, devView);
     }
 };
+
+template <
+  typename ContainerT
+>
+auto make_factory(ContainerT& container)
+-> factory<ContainerT>
+{
+    return std::move(factory<ContainerT>(container));
+}
 
 } /* view */
 
