@@ -12,8 +12,6 @@ namespace view {
 namespace details {
 
 /* ALPAKA CODE BEGIN */
-#if 1
-
 
 namespace internal
 {
@@ -200,20 +198,7 @@ struct AlpakaShared
 
     }
 };
-#endif
 /* ALPAKA CODE END */
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -277,10 +262,6 @@ struct factory
     container_type& myContainer;
     factory(container_type& container): myContainer(container) {
     }
-    /*
-    struct myView: public llama::View {
-
-    }*/
     template<
         typename DevT
     >
@@ -398,8 +379,6 @@ struct factory
         using mapping_type             = typename container_value_type::mapping_type;
         using user_domain_type         = typename mapping_type::UserDomain;
         using non_const_dev_acc        = std::remove_const_t<DeviceAccT>;
-        //auto user_domain = container_factory_type::extent(myContainer);
-        //auto mapping = mapping_type(user_domain); 
         using alpakaMirror = details::AlpakaMirror<
           non_const_dev_acc,
           size_type,
